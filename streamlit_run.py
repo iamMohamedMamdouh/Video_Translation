@@ -7,6 +7,7 @@ import os
 from pydub import AudioSegment
 import asyncio
 import edge_tts
+from pydub.effects import speedup
 
 st.set_page_config(page_title="Video Translation", layout="centered")
 st.title("🎬 Automatic Video Translation")
@@ -16,10 +17,10 @@ voice_options = {
     "ذكر جزائري": {"ar": "ar-DZ-IsmaelNeural", "en": "en-US-EricNeural"},
     "أنثى سعودية": {"ar": "ar-SA-ZariyahNeural", "en": "en-US-EmmaMultilingualNeural"},
     "ذكر سعودي": {"ar": "ar-SA-HamedNeural", "en": "en-US-EricNeural"},
-    "أنثى لبنانيه": {"ar": "ar-LB-LaylaNeural", "en": "en-US-EmmaMultilingualNeural"},
+    "أنثى لبنانية": {"ar": "ar-LB-LaylaNeural", "en": "en-US-EmmaMultilingualNeural"},
 }
-voice_gender = st.selectbox("Select the type of voice", list(voice_options.keys()), index=0)
 
+voice_gender = st.selectbox("Select the type of voice", list(voice_options.keys()), index=0)
 uploaded_video = st.file_uploader("Upload a video", type=["mp4", "mov", "avi", "mkv"])
 
 async def convert_text_to_speech(text, lang, voice_gender):
@@ -48,7 +49,6 @@ if uploaded_video:
         source_lang = "ar" if result["language"] == "ar" else "en"
         target_lang = "en" if source_lang == "ar" else "ar"
 
-
         translated_text = GoogleTranslator(source='auto', target=target_lang).translate(original_text)
 
         tts_path = asyncio.run(convert_text_to_speech(translated_text, target_lang, voice_gender))
@@ -56,7 +56,6 @@ if uploaded_video:
         audio = AudioSegment.from_file(tts_path)
         original_audio_duration = audio.duration_seconds
         video_duration = video_clip.duration
-        from pydub.effects import speedup
 
         if not video_duration or video_duration == 0:
             st.error("❌ مدة الفيديو غير صالحة.")
@@ -65,21 +64,21 @@ if uploaded_video:
         speed_factor = original_audio_duration / video_duration
 
         if speed_factor == 0 or speed_factor == float('inf'):
-            st.warning("⚠️ حصلت مشكلة في ضبط السرعة. هيتم استخدام الصوت كما هو.")
+            st.warning("⚠️ حصلت مشكلة في ضبط السرعة. سيتم استخدام الصوت كما هو.")
             new_audio = audio
         else:
             try:
                 new_audio = speedup(audio, playback_speed=speed_factor, crossfade=0)
             except ZeroDivisionError:
-                st.warning("⚠️ الصوت قصير جدًا للتعديل، هيتم استخدامه بدون تسريع.")
+                st.warning("⚠️ الصوت قصير جدًا للتعديل، سيتم استخدامه كما هو.")
                 new_audio = audio
 
         adjusted_audio_path = os.path.join(tempfile.gettempdir(), "adjusted_voice.wav")
         new_audio.export(adjusted_audio_path, format="wav")
 
         final_path = os.path.join(tempfile.gettempdir(), "final_video.mp4")
-        new_audio = AudioFileClip(adjusted_audio_path)
-        new_video = video_clip.set_audio(new_audio)
+        new_audio_clip = AudioFileClip(adjusted_audio_path)
+        new_video = video_clip.set_audio(new_audio_clip)
         new_video.write_videofile(final_path, codec="libx264", audio_codec="aac")
 
         st.success("✅ تم الانتهاء! الفيديو بعد الترجمة:")
