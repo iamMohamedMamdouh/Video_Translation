@@ -37,6 +37,8 @@ if uploaded_video:
         tmp.write(uploaded_video.read())
         video_path = tmp.name
 
+    tts_path = None 
+
     try:
         video_clip = VideoFileClip(video_path)
         audio_path = video_path.replace(".mp4", ".mp3")
@@ -91,8 +93,8 @@ if uploaded_video:
                 video_clip.audio.reader.close_proc()
         except:
             pass
-        for f in [video_path, audio_path, tts_path]:
-            if os.path.exists(f):
+        for f in [video_path, audio_path, tts_path]:  # ← خليها زي كده
+            if f and os.path.exists(f):    
                 try:
                     os.remove(f)
                 except:
