@@ -1,8 +1,9 @@
 streamlit
-moviepy
+moviepy==1.0.3
 whisper
 gTTS
 deep_translator
 pydub
 ffmpeg-python
+torch
 edge-tts
