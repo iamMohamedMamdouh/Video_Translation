@@ -6,3 +6,4 @@ deep_translator
 pydub
 ffmpeg-python
 torch
+opencv-python
