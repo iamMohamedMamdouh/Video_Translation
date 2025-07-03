@@ -1,12 +1,8 @@
 streamlit
-torch
+moviepy
 whisper
 gTTS
 deep_translator
 pydub
 ffmpeg-python
-imageio
-imageio-ffmpeg
-tqdm
-python-dotenv
-git+https://github.com/Zulko/moviepy.git
+edge-tts
