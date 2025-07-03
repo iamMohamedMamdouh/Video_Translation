@@ -20,6 +20,7 @@ voice_options = {
     "أنثى لبنانية": {"ar": "ar-LB-LaylaNeural", "en": "en-US-EmmaMultilingualNeural"},
 }
 
+
 voice_gender = st.selectbox("Select the type of voice", list(voice_options.keys()), index=0)
 uploaded_video = st.file_uploader("Upload a video", type=["mp4", "mov", "avi", "mkv"])
 
@@ -33,12 +34,15 @@ async def convert_text_to_speech(text, lang, voice_gender):
 if uploaded_video:
     st.video(uploaded_video)
 
+    video_path = None
+    audio_path = None
+    tts_path = None
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
         tmp.write(uploaded_video.read())
         video_path = tmp.name
 
     try:
-        # Extract audio using ffmpeg
         audio_path = video_path.replace(".mp4", ".mp3")
         ffmpeg.input(video_path).output(audio_path).run(overwrite_output=True)
 
@@ -52,7 +56,6 @@ if uploaded_video:
         translated_text = GoogleTranslator(source='auto', target=target_lang).translate(original_text)
 
         tts_path = asyncio.run(convert_text_to_speech(translated_text, target_lang, voice_gender))
-
         audio = AudioSegment.from_file(tts_path)
         original_audio_duration = audio.duration_seconds
 
@@ -60,7 +63,7 @@ if uploaded_video:
             probe = ffmpeg.probe(video_path)
             video_duration = float(probe["format"]["duration"])
         except Exception:
-            st.error("❌ Unable to read video duration.")
+            st.error("❌ لم أتمكن من قراءة مدة الفيديو.")
             st.stop()
 
         if video_duration == 0:
@@ -68,9 +71,8 @@ if uploaded_video:
             st.stop()
 
         speed_factor = original_audio_duration / video_duration
-
         if speed_factor == 0 or speed_factor == float('inf'):
-            st.warning("⚠️ حصلت مشكلة في ضبط السرعة. سيتم استخدام الصوت كما هو.")
+            st.warning("⚠️ مشكلة في ضبط السرعة. سيتم استخدام الصوت كما هو.")
             new_audio = audio
         else:
             try:
@@ -83,11 +85,9 @@ if uploaded_video:
         new_audio.export(adjusted_audio_path, format="wav")
 
         final_path = os.path.join(tempfile.gettempdir(), "final_video.mp4")
-
-        # Combine new audio and original video using ffmpeg
         ffmpeg.output(
-            ffmpeg.input(video_path).video,  # فيديو من الملف الأصلي
-            ffmpeg.input(adjusted_audio_path).audio,  # الصوت الجديد
+            ffmpeg.input(video_path).video,
+            ffmpeg.input(adjusted_audio_path).audio,
             final_path,
             vcodec='copy',
             acodec='aac',
@@ -96,12 +96,13 @@ if uploaded_video:
 
         st.success("✅ تم الانتهاء! الفيديو بعد الترجمة:")
         st.video(final_path)
+
         with open(final_path, "rb") as f:
-            st.download_button("📥 Download Translated Video", data=f, file_name="translated_video.mp4", mime="video/mp4")
+            st.download_button("📥 تحميل الفيديو", data=f, file_name="translated_video.mp4", mime="video/mp4")
 
     finally:
         for f in [video_path, audio_path, tts_path]:
-            if os.path.exists(f):
+            if f and os.path.exists(f):
                 try:
                     os.remove(f)
                 except:
