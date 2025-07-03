@@ -1,7 +1,7 @@
 streamlit
-whisper
-deep_translator
-pydub
 ffmpeg-python
+whisper
 edge-tts
+pydub
+deep_translator
 torch
