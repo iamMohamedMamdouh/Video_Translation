@@ -37,30 +37,20 @@ if uploaded_video:
         video_path = tmp.name
 
     try:
-        #st.info("🎧 استخراج الصوت من الفيديو...")
         video_clip = VideoFileClip(video_path)
         audio_path = video_path.replace(".mp4", ".mp3")
         video_clip.audio.write_audiofile(audio_path)
 
-        #st.info("🧠 تحويل الصوت إلى نص (Whisper)...")
         model = whisper.load_model("base")
         result = model.transcribe(audio_path)
         original_text = result["text"]
 
-        # تحديد اللغة الأصلية
         source_lang = "ar" if result["language"] == "ar" else "en"
         target_lang = "en" if source_lang == "ar" else "ar"
 
-        #st.subheader("📝 النص المستخرج:")
-        #st.write(original_text)
 
-        #st.info(f"🌐 ترجمة النص إلى {'عربية' if target_lang == 'ar' else 'إنجليزية'}...")
         translated_text = GoogleTranslator(source='auto', target=target_lang).translate(original_text)
 
-        #st.subheader("🌍 الترجمة:")
-        #st.write(translated_text)
-
-        #st.info("🔊 تحويل الترجمة إلى صوت...")
         tts_path = asyncio.run(convert_text_to_speech(translated_text, target_lang, voice_gender))
 
         audio = AudioSegment.from_file(tts_path)
@@ -68,7 +58,6 @@ if uploaded_video:
         video_duration = video_clip.duration
         from pydub.effects import speedup
 
-        # 3️⃣ ضبط السرعة
         if not video_duration or video_duration == 0:
             st.error("❌ مدة الفيديو غير صالحة.")
             st.stop()
@@ -88,7 +77,6 @@ if uploaded_video:
         adjusted_audio_path = os.path.join(tempfile.gettempdir(), "adjusted_voice.wav")
         new_audio.export(adjusted_audio_path, format="wav")
 
-        #st.info("🎞️ تركيب الصوت الجديد على الفيديو...")
         final_path = os.path.join(tempfile.gettempdir(), "final_video.mp4")
         new_audio = AudioFileClip(adjusted_audio_path)
         new_video = video_clip.set_audio(new_audio)
