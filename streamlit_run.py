@@ -1,5 +1,4 @@
 import streamlit as st
-from moviepy.editor import VideoFileClip, AudioFileClip
 import tempfile
 import whisper
 from deep_translator import GoogleTranslator
@@ -8,6 +7,7 @@ from pydub import AudioSegment
 import asyncio
 import edge_tts
 from pydub.effects import speedup
+import ffmpeg
 
 st.set_page_config(page_title="Video Translation", layout="centered")
 st.title("🎬 Automatic Video Translation")
@@ -37,12 +37,10 @@ if uploaded_video:
         tmp.write(uploaded_video.read())
         video_path = tmp.name
 
-    tts_path = None 
-
     try:
-        video_clip = VideoFileClip(video_path)
+        # Extract audio using ffmpeg
         audio_path = video_path.replace(".mp4", ".mp3")
-        video_clip.audio.write_audiofile(audio_path)
+        ffmpeg.input(video_path).output(audio_path).run(overwrite_output=True)
 
         model = whisper.load_model("base")
         result = model.transcribe(audio_path)
@@ -57,9 +55,15 @@ if uploaded_video:
 
         audio = AudioSegment.from_file(tts_path)
         original_audio_duration = audio.duration_seconds
-        video_duration = video_clip.duration
 
-        if not video_duration or video_duration == 0:
+        try:
+            probe = ffmpeg.probe(video_path)
+            video_duration = float(probe["format"]["duration"])
+        except Exception:
+            st.error("❌ Unable to read video duration.")
+            st.stop()
+
+        if video_duration == 0:
             st.error("❌ مدة الفيديو غير صالحة.")
             st.stop()
 
@@ -79,22 +83,25 @@ if uploaded_video:
         new_audio.export(adjusted_audio_path, format="wav")
 
         final_path = os.path.join(tempfile.gettempdir(), "final_video.mp4")
-        new_audio_clip = AudioFileClip(adjusted_audio_path)
-        new_video = video_clip.set_audio(new_audio_clip)
-        new_video.write_videofile(final_path, codec="libx264", audio_codec="aac")
+
+        # Combine new audio and original video using ffmpeg
+        ffmpeg.output(
+            ffmpeg.input(video_path).video,  # فيديو من الملف الأصلي
+            ffmpeg.input(adjusted_audio_path).audio,  # الصوت الجديد
+            final_path,
+            vcodec='copy',
+            acodec='aac',
+            strict='experimental'
+        ).run(overwrite_output=True)
 
         st.success("✅ تم الانتهاء! الفيديو بعد الترجمة:")
         st.video(final_path)
+        with open(final_path, "rb") as f:
+            st.download_button("📥 Download Translated Video", data=f, file_name="translated_video.mp4", mime="video/mp4")
 
     finally:
-        try:
-            video_clip.reader.close()
-            if video_clip.audio:
-                video_clip.audio.reader.close_proc()
-        except:
-            pass
-        for f in [video_path, audio_path, tts_path]:  # ← خليها زي كده
-            if f and os.path.exists(f):    
+        for f in [video_path, audio_path, tts_path]:
+            if os.path.exists(f):
                 try:
                     os.remove(f)
                 except:
