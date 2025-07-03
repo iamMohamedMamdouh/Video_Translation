@@ -1,7 +1,6 @@
 streamlit
-ffmpeg-python
-whisper
+git+https://github.com/openai/whisper.git
+deep_translator
 edge-tts
 pydub
-deep_translator
-torch
+ffmpeg-python
