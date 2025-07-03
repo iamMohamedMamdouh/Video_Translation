@@ -3,11 +3,10 @@ import tempfile
 import whisper
 from deep_translator import GoogleTranslator
 import os
-from pydub import AudioSegment
 import asyncio
 import edge_tts
-from pydub.effects import speedup
 import ffmpeg
+from pydub import AudioSegment
 
 st.set_page_config(page_title="Video Translation", layout="centered")
 st.title("🎬 Automatic Video Translation")
@@ -19,7 +18,6 @@ voice_options = {
     "ذكر سعودي": {"ar": "ar-SA-HamedNeural", "en": "en-US-EricNeural"},
     "أنثى لبنانية": {"ar": "ar-LB-LaylaNeural", "en": "en-US-EmmaMultilingualNeural"},
 }
-
 
 voice_gender = st.selectbox("Select the type of voice", list(voice_options.keys()), index=0)
 uploaded_video = st.file_uploader("Upload a video", type=["mp4", "mov", "avi", "mkv"])
@@ -33,10 +31,6 @@ async def convert_text_to_speech(text, lang, voice_gender):
 
 if uploaded_video:
     st.video(uploaded_video)
-
-    video_path = None
-    audio_path = None
-    tts_path = None
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
         tmp.write(uploaded_video.read())
@@ -56,33 +50,25 @@ if uploaded_video:
         translated_text = GoogleTranslator(source='auto', target=target_lang).translate(original_text)
 
         tts_path = asyncio.run(convert_text_to_speech(translated_text, target_lang, voice_gender))
+
         audio = AudioSegment.from_file(tts_path)
         original_audio_duration = audio.duration_seconds
 
-        try:
-            probe = ffmpeg.probe(video_path)
-            video_duration = float(probe["format"]["duration"])
-        except Exception:
-            st.error("❌ لم أتمكن من قراءة مدة الفيديو.")
-            st.stop()
-
-        if video_duration == 0:
-            st.error("❌ مدة الفيديو غير صالحة.")
-            st.stop()
-
-        speed_factor = original_audio_duration / video_duration
-        if speed_factor == 0 or speed_factor == float('inf'):
-            st.warning("⚠️ مشكلة في ضبط السرعة. سيتم استخدام الصوت كما هو.")
-            new_audio = audio
-        else:
-            try:
-                new_audio = speedup(audio, playback_speed=speed_factor, crossfade=0)
-            except ZeroDivisionError:
-                st.warning("⚠️ الصوت قصير جدًا للتعديل، سيتم استخدامه كما هو.")
-                new_audio = audio
+        probe = ffmpeg.probe(video_path)
+        video_duration = float(probe["format"]["duration"])
 
         adjusted_audio_path = os.path.join(tempfile.gettempdir(), "adjusted_voice.wav")
-        new_audio.export(adjusted_audio_path, format="wav")
+        speed_factor = video_duration / original_audio_duration
+
+        if 0.5 <= speed_factor <= 2.0:
+            ffmpeg.input(tts_path).output(adjusted_audio_path, **{
+                'filter:a': f'atempo={speed_factor:.2f}'
+            }).run(overwrite_output=True)
+        else:
+            AudioSegment.from_file(tts_path).export(adjusted_audio_path, format="wav")
+
+        cleaned = AudioSegment.from_file(adjusted_audio_path)[200:]
+        cleaned.export(adjusted_audio_path, format="wav")
 
         final_path = os.path.join(tempfile.gettempdir(), "final_video.mp4")
         ffmpeg.output(
@@ -91,18 +77,19 @@ if uploaded_video:
             final_path,
             vcodec='copy',
             acodec='aac',
+            shortest=None,
             strict='experimental'
         ).run(overwrite_output=True)
 
-        st.success("✅ تم الانتهاء! الفيديو بعد الترجمة:")
+        st.success("✅ Video after translation:")
         st.video(final_path)
 
         with open(final_path, "rb") as f:
             st.download_button("Download", data=f, file_name="translated_video.mp4", mime="video/mp4")
 
     finally:
-        for f in [video_path, audio_path, tts_path]:
-            if f and os.path.exists(f):
+        for f in [video_path, audio_path, tts_path, adjusted_audio_path]:
+            if os.path.exists(f):
                 try:
                     os.remove(f)
                 except:
