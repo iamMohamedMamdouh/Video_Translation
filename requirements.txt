@@ -1,8 +1,7 @@
 streamlit
-moviepy==1.0.3
-https://github.com/openai/whisper.gitgTTS
+whisper
 deep_translator
 pydub
 ffmpeg-python
-torch
 edge-tts
+torch
