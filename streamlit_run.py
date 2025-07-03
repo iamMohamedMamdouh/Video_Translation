@@ -98,7 +98,7 @@ if uploaded_video:
         st.video(final_path)
 
         with open(final_path, "rb") as f:
-            st.download_button("📥 تحميل الفيديو", data=f, file_name="translated_video.mp4", mime="video/mp4")
+            st.download_button("Download", data=f, file_name="translated_video.mp4", mime="video/mp4")
 
     finally:
         for f in [video_path, audio_path, tts_path]:
