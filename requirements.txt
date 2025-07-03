@@ -4,5 +4,5 @@ whisper
 gTTS
 deep_translator
 pydub
-torch
 ffmpeg-python
+torch
