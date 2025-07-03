@@ -46,29 +46,23 @@ if uploaded_video:
 
         source_lang = "ar" if result["language"] == "ar" else "en"
         target_lang = "en" if source_lang == "ar" else "ar"
-
         translated_text = GoogleTranslator(source='auto', target=target_lang).translate(original_text)
 
         tts_path = asyncio.run(convert_text_to_speech(translated_text, target_lang, voice_gender))
-
         audio = AudioSegment.from_file(tts_path)
-        original_audio_duration = audio.duration_seconds
+        tts_duration = audio.duration_seconds
 
-        probe = ffmpeg.probe(video_path)
-        video_duration = float(probe["format"]["duration"])
+        video_info = ffmpeg.probe(video_path)
+        video_duration = float(video_info['format']['duration'])
+
+        speed_factor = video_duration / tts_duration if tts_duration else 1.0
 
         adjusted_audio_path = os.path.join(tempfile.gettempdir(), "adjusted_voice.wav")
-        speed_factor = video_duration / original_audio_duration
-
         if 0.5 <= speed_factor <= 2.0:
-            ffmpeg.input(tts_path).output(adjusted_audio_path, **{
-                'filter:a': f'atempo={speed_factor:.2f}'
-            }).run(overwrite_output=True)
+            ffmpeg.input(tts_path).filter('atempo', speed_factor).output(adjusted_audio_path).overwrite_output().run()
         else:
-            AudioSegment.from_file(tts_path).export(adjusted_audio_path, format="wav")
-
-        cleaned = AudioSegment.from_file(adjusted_audio_path)[200:]
-        cleaned.export(adjusted_audio_path, format="wav")
+            st.warning("⚠ تم تجاوز الحد المسموح لتسريع الصوت. سيتم استخدام الصوت كما هو.")
+            adjusted_audio_path = tts_path
 
         final_path = os.path.join(tempfile.gettempdir(), "final_video.mp4")
         ffmpeg.output(
@@ -77,17 +71,16 @@ if uploaded_video:
             final_path,
             vcodec='copy',
             acodec='aac',
-            shortest=None,
             strict='experimental'
         ).run(overwrite_output=True)
 
         st.success("✅ Video after translation:")
         st.video(final_path)
-
         with open(final_path, "rb") as f:
-            st.download_button("Download", data=f, file_name="translated_video.mp4", mime="video/mp4")
+            st.download_button("Download Video", data=f, file_name="translated_video.mp4", mime="video/mp4")
 
     finally:
+        # تنظيف الملفات المؤقتة
         for f in [video_path, audio_path, tts_path, adjusted_audio_path]:
             if os.path.exists(f):
                 try:
