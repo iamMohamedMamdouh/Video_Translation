@@ -1,7 +1,6 @@
 streamlit
 moviepy==1.0.3
-whisper
-gTTS
+https://github.com/openai/whisper.gitgTTS
 deep_translator
 pydub
 ffmpeg-python
